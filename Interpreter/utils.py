@@ -1,0 +1,10 @@
+from managers.operation_manager import OperationManager
+from managers.variable_manager import VariableManager
+from managers.function_manager import FunctionManager
+from managers.statement_manager import StatementManager
+from command_parser import Parser
+Parser
+FunctionManager
+OperationManager
+VariableManager
+StatementManager
