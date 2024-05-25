@@ -81,7 +81,37 @@ class TypeError(CustomException):
 
     def __str__(self):
         return super().__str__()
+class FunctionNotFoundError(CustomException):
+    def __init__(self, message, line_count=None, tokens=None, error_token=None):
+        super().__init__(message, line_count, tokens, error_token)
 
+    def __str__(self):
+        return super().__str__()
+class StatementError(CustomException):
+    def __init__(self, message, line_count=None, tokens=None, error_token=None):
+        super().__init__(message, line_count, tokens, error_token)
+
+    def __str__(self):
+        return super().__str__()
+class CollectionError(CustomException):
+    def __init__(self, message, line_count=None, tokens=None, error_token=None):
+        super().__init__(message, line_count, tokens, error_token)
+
+    def __str__(self):
+        return super().__str__()
+
+class MissingParenthesisError(CustomException):
+    def __init__(self, message, line_count=None, tokens=None, error_token=None):
+        super().__init__(message, line_count, tokens, error_token)
+
+    def __str__(self):
+        return super().__str__()
+class RecursionDepthError(CustomException):
+    def __init__(self, message, line_count=None, tokens=None, error_token=None):
+        super().__init__(message, line_count, tokens, error_token)
+
+    def __str__(self):
+        return super().__str__()
 
 # Example usage
 if __name__ == "__main__":

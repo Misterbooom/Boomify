@@ -7,18 +7,22 @@ from utils import (
     StatementManager
 )
 from exceptions import ParsingError, CustomException,BoomError
-import traceback
+import sys
+from built_in.base_function import BaseFunction
+from icecream import ic
+
+sys.set_int_max_str_digits(0)
 
 class Interpreter:
     def __init__(self, debug_mode=False, code:list=None):
-        self.RESERVED_KEYWORDS = {"var", "explode", "ignite", "if", "else",'while'}
+        self.RESERVED_KEYWORDS = {"var", "explode", "ignite", "if", "else",'while','for','func'}
         self.OPERATORS = {"=", "+=", "-=", "*=", "/=", "%=", "+", "-", "*", "/", "%"}
         self.valid_commands = ["explode", "ignite"]
         self.operators = ['=',"+=", "-=", "*=", "/=", "%="]
         self.arithmetic_operators = ["+", "-", "*", "/", "%"]
         self.debug_mode = debug_mode
         self.logs = {}
-        self.var_manager = VariableManager(self)
+        self.context_manager = ContextManager(self)
         self.op_manager = OperationManager(self)
         self.func_manager = FunctionManager(self)
         self.var_check = CheckVariables(self)
@@ -27,31 +31,36 @@ class Interpreter:
         self.line_count = 0
         self.code = code
         self.statement_line = None
-        self.lines_to_skip = []
-        self.if_condition = None
-        self.else_line = None  # Track the line number of 'else'
-        self.command = None
-        self.restart_index = None
-        self.start_index = None
+        self.lines_to_skip = set()
         
+        self.if_condition = None
+        self.else_line = None  
+        self.command = None
+        self.skip_to = None
+        self.nested_levels = 0
+        self.context = "global"
     def interpret_code(self):
         i = 0
         while i < len(self.code):
 
+            if  self.skip_to is not None:
+                i = self.skip_to
+                self.skip_to = None
             command = self.code[i]
-            if i == self.restart_index:
-                i = self.start_index if self.start_index is not None else 0
+            self.interpret_command(command, i) 
             i += 1
 
-            self.interpret_command(command, i)
-            
+    def interpret_command(self, command: str, i, context = None):
+        if context is not None :
+            self.context = context
 
-            
-
-    def interpret_command(self, command: str, i):
         self.line_count = i
-        if self.line_count  in self.lines_to_skip:
+        if command.startswith('!!'):
             return
+        if self.debug_mode:                                            
+            for name, log in self.logs.items():
+                print(f"{name}: {log}")
+
         if command == "" or len(command.split()) == 0:
             return
 
@@ -61,25 +70,37 @@ class Interpreter:
         self.tokens = command.split()
         self.command = command
         self.log("Tokens", self.tokens)
-        self.log("Vars", self.var_manager.vars) 
-        # Check if the command is a function
-        if self.tokens[0] != 'var'  and self.func_manager.find_function(command):
+        self.log("Vars", self.context_manager.get_all_vars())
+        self.log('Lines To skip ', self.lines_to_skip)
+        function = self.func_manager.find_function(command)
+        if self.tokens[0] != 'var'  and function:
+            if function is not None: 
+                if isinstance(function,BaseFunction):
+                    function.activate(command)
+                else:
+                    function.activate()
+
             return
 
         # Check for if/else statements
-        elif self.tokens[0] == "if":
+        elif self.tokens[0].startswith("if"):
             self.statement_manager.handle_if(command)
-        elif self.tokens[0] == "else":
+            return
+        elif self.tokens[0].startswith("else"):
             self.statement_manager.handle_else(command)
-        elif self.tokens[0] == 'while':
-            self.statement_manager.handle_while(command,i)
-        # Check for variable assignment or operation
-        
-        self.var_check.check(self.tokens)   
+            return
+        elif self.tokens[0].startswith("while"):
+            self.statement_manager.handle_while(command, i)
+            return
+        elif self.tokens[0].startswith("for"):
+            self.statement_manager.handle_for(command, i)
+            return
+        elif self.tokens[0].startswith("func"):
+            self.func_manager.define_function(command, i)
+            return
+        self.var_check.check(command) 
 
-        if self.debug_mode:                                            
-            for name, log in self.logs.items():
-                print(f"{name}: {log}")
+
 
     def check_syntax(self, tokens, var_name, operator, var_value):
         if var_name in self.RESERVED_KEYWORDS:
@@ -92,12 +113,12 @@ class Interpreter:
             self.raise_error(
                 BoomError, f"Invalid operator '{operator}'", operator
             )
-
-   
+  
     def log(self, name, message):
         self.logs.setdefault(name, [])
         self.logs[name].append(message)
-
+    def get_vars(self):
+        self.context_manager
     def raise_error(
         self, error: CustomException, message, error_token=None, line=None, tokens=None
     ):
@@ -107,19 +128,39 @@ class Interpreter:
             self.command if not tokens else tokens,
             error_token,
         )
-        if self.debug_mode:
-            traceback.print_exc()
+        
         print(exception)
+        raise Exception
         exit()
-
-
-class CheckVariables:
+class ContextManager:
     def __init__(self, interpreter: Interpreter):
         self.interpreter = interpreter
+        self.var_manager = VariableManager(self.interpreter)
+    def get_globals(self):
+        return self.var_manager.global_vars
+    def get_locals(self):
+        
+        return self.var_manager.locals_vars[self.interpreter.context]
+    def set_var(self, var_name, var_value):
+        self.var_manager.variable_assignment(var_name, f"{var_value}", self.interpreter.context)
+    def get_vars(self):
+        if self.interpreter.context != 'global':
+            return self.var_manager.locals_vars.get(self.interpreter.context,None)
+        else:
+            return self.var_manager.global_vars
+    def get_all_vars(self):
+        return {'globals':self.var_manager.global_vars,'locals':self.var_manager.locals_vars}
+class CheckVariables:
+    def __init__(self, interpreter: Interpreter, ):
+        self.interpreter = interpreter
+        self.var_manager = self.interpreter.context_manager.var_manager
 
-    def check(self, tokens: list[str]):
-        command = " ".join(tokens).replace('var','')
-        var_name, operator, var_value = self.interpreter.parser.find_var(command)
+    def check(self, command: str):
+        command = command
+        tokens = command.split()
+        var_name, operator, var_value = self.interpreter.parser.find_var(
+            command.replace("var", "")
+        )
         if not var_name or not operator or not var_value:
             return
         if tokens[0] == 'var':
@@ -134,17 +175,22 @@ class CheckVariables:
             check_operators = any(op in var_value for op in self.interpreter.arithmetic_operators)
             if operator == "=":
                 if check_operators:
-                    result = self.interpreter.op_manager.arithmetic_operation(var_value)
-                    self.interpreter.var_manager.variable_assignment(var_name, f"{result}")
+                    result = self.interpreter.op_manager.arithmetic_operation(var_value,self.interpreter.context_manager.get_vars())
+                    var_value = self.var_manager.variable_assignment(
+                        var_name, f"{result}", self.interpreter.context
+                    )
                     
                 else:
-                    self.interpreter.var_manager.variable_assignment(var_name, var_value)
+                    self.var_manager.variable_assignment(
+                        var_name, var_value, self.interpreter.context
+                    )
         elif operator in self.interpreter.operators:
             try:
                 result = self.interpreter.op_manager.perform_operation(
-                    var_name, var_value, operator
+                    var_name, var_value, operator,self.interpreter.context_manager.get_vars()
                 )
-                self.interpreter.var_manager.vars[var_name] = result
+                self.var_manager.variable_assignment(var_name, f"{result}",self.interpreter.context)
+
                 self.interpreter.log(
                     var_name, f"Updated {var_name} using {operator} to {result}"
                 )
@@ -152,7 +198,7 @@ class CheckVariables:
                 self.interpreter.raise_error(
                     ParsingError, f"Variable - {var_name} not defined", ' ' + var_name
                 )
-
+        return var_name
 
 def run_interpreter():
     while True:

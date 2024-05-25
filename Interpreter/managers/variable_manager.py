@@ -1,38 +1,44 @@
-from exceptions import VariableError,TypeError
+from exceptions import VariableError,TypeError, CollectionError
 from type.interpreter_type import InterpreterType
-
-from icecream import ic
+from icecream import ic  # noqa: F401
 class VariableManager:
     def __init__(self, interpreter: InterpreterType):
-        self.vars = {}
+        self.global_vars = {}
+        self.locals_vars = {}
         self.interpreter = interpreter
         self.vars_type = {
             "str": [("'", "'"), ('"', '"')],
             "tuple": [("(", ")")],
             "list": [("[", "]")],
         }
-        self.func_count = 0
-    def variable_assignment(self, var_name: str = None, var_value: str = None):
 
+    def variable_assignment(
+        self,
+        var_name: str = None,
+        var_value: str = None,
+        context="global",
+    ):
+        if not context:
+            raise Exception()
         var_type = self.check_var_type(var_value)
         self.interpreter.log("Type Setting", f"Type set to {var_type} for {var_value}")
-        if var_name :
+        ic(var_type) if self.interpreter.debug_mode else None
+        if var_name:
             self.check_correct_var_name(var_name)
         if not var_type:
             self.interpreter.raise_error(
                 VariableError, "Invalid variable type", var_value
             )
         var_value = self.parse_value(var_type, var_value)
-        
         if var_name:
-            self.vars[var_name] = var_value
-            self.interpreter.log("Variables", self.vars)
-            self.interpreter.log(var_name, f"Assigned {var_value} to {var_name}")
-            
-        return var_value
+            if context == "global":
+                self.global_vars[var_name] = var_value
+            else:
+                locals: dict = self.locals_vars.get(context, {})
+                locals.update({var_name: var_value})
+                self.locals_vars[context] = locals
 
     def check_var_type(self, var_value: str): 
-        ic(var_value)
         if self.interpreter.func_manager.get_function(var_value,True,False):
             return "function"
 
@@ -58,7 +64,7 @@ class VariableManager:
                         "Type Check", f"Type {var_type} identified for {var_value}"
                     )
                     return var_type
-        self.func_count = 0
+
         return None
     def parse_value(self,var_type:str, var_value: str):
         try:
@@ -73,7 +79,7 @@ class VariableManager:
             elif var_type == "list":
                 var_value = self.collection_assignment(var_value, list)
             elif var_type == "function":
-                var_value = self.interpreter.func_manager.get_function(var_value.replace('call ', ''))
+                var_value = self.interpreter.func_manager.get_function(var_value)
             return var_value
                 
         except SyntaxError as e:
@@ -91,6 +97,8 @@ class VariableManager:
             self.interpreter.raise_error(
                 VariableError, "Invalid variable name", var_name[0]
             )
+        if not var_name.isalnum() and var_name != "_":  # Allow underscores
+            self.interpreter.raise_error(VariableError, "Invalid characters in variable name", var_name)
         if ' ' in var_name:
             self.interpreter.raise_error(
                 VariableError, "Variable names cannot contain spaces", var_name
@@ -100,9 +108,12 @@ class VariableManager:
         elements = collection_str.strip("[]()").split(",")
         new_collection = []
         for element in elements:
-            element = element.strip()
-            if element != "":
-                new_collection.append(self.variable_assignment(var_value=element))
+            try:
+                element = element.strip()
+                if element != "":
+                    new_collection.append(self.variable_assignment(var_value=element))
+            except (VariableError, TypeError):
+                self.interpreter.raise_error(CollectionError, f"Error in collection element: {element}", element)
         self.interpreter.log(
             "Collection Assignment", f"Assigned {new_collection} to collection"
         )

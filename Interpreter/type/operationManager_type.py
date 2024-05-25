@@ -7,7 +7,7 @@ class OperationManager:
 
     def arithmetic_operation(self, expression):
         try:
-            result = eval(expression, None, self.interpreter.var_manager.vars)
+            result = eval(expression, None, self.interpreter.get_vars())
         except SyntaxError:
             self.interpreter.raise_error(
                 OperationError, "Invalid expression", expression
@@ -15,7 +15,7 @@ class OperationManager:
         return result
 
     def perform_operation(self, var_name, var_value, operator):
-        current_value = self.interpreter.var_manager.vars[var_name]
+        current_value = self.interpreter.get_vars()[var_name]
         operation_value = self.arithmetic_operation(var_value)
         if operator == "+=":
             result = current_value + operation_value

@@ -8,5 +8,5 @@ class Ignite(BaseBuiltinFunction):
 
     def execute(self, args):
         user_input = input(f"{args[0]}")
-        self.func_return = user_input
+        self.func_return = f"'{user_input}'"
         

@@ -17,12 +17,17 @@ class InterpreterType:
         self.line_count = 0
         self.code = code
         self.statement_line = None
-        self.lines_to_skip = []
+        self.lines_to_skip = set()
         self.if_condition = None
         self.else_line = None  # Track the line number of 'else'
         self.command = None
+        self.var_check = CheckVariables(self)
+        self.nested_levels = 0
+        self.restart_index = None
+        self.start_index = None
 
-    def interpret_command(self, command: str):
+    def interpret_command(self, command: str, i, ignore_skip = False,var_manager = None):
+
         self.line_count += 1
         self.logs.clear()
         self.tokens = command.split()
@@ -37,7 +42,21 @@ class InterpreterType:
         self.logs.setdefault(name, [])
         self.logs[name].append(message)
 
-    def raise_error(self, error: CustomException, message, error_token=None):
+    def raise_error(
+        self, error: CustomException, message, error_token=None, line=None, tokens=None
+    ):
         exception = error(message, self.line_count, self.tokens, error_token)
         print(exception)
         exit()
+    def get_vars(self, var_name = None):
+        if var_name in self.global_var_manager.vars:
+            return self.global_var_manager.vars[var_name]
+        
+        return self.global_var_manager.vars
+
+class CheckVariables:
+    def __init__(self, interpreter: InterpreterType):
+        self.interpreter = interpreter
+
+    def check(self, command: str):
+        pass

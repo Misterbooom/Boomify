@@ -4,7 +4,8 @@ from exceptions import VariableError,TypeError
 
 class VariableManager:
     def __init__(self, interpreter):
-        self.vars = {}
+        self.global_vars = {}
+        self.locals_vars = {}
         self.interpreter = interpreter
         self.vars_type = {
             "str": [("'", "'"), ('"', '"')],
@@ -12,7 +13,7 @@ class VariableManager:
             "list": [("[", "]")],
         }
 
-    def variable_assignment(self, var_name: str = None, var_value: str = None):
+    def variable_assignment(self, var_name: str = None, var_value: str = None, context = 'global', local_name = None):
         var_type = self.check_var_type(var_value)
         self.interpreter.log("Type Setting", f"Type set to {var_type} for {var_value}")
         ic(var_type) if self.interpreter.debug_mode else None
@@ -24,9 +25,12 @@ class VariableManager:
             )
         var_value = self.parse_value(var_type, var_value)
         if var_name:
-            self.vars[var_name] = var_value
-            self.interpreter.log("Variables", self.vars)
-        return var_value
+            if context == 'global':
+                self.global_vars[var_name] = var_value
+            else:
+                if local_name:
+                    
+                    self.locals_vars[local_name] = self.locals_vars.get(local_name, {}).update({var_name: var_value})
 
     def check_var_type(self, var_value: str):
         ic(var_value) if self.interpreter.debug_mode else None
@@ -75,17 +79,17 @@ class VariableManager:
 
         except SyntaxError:
             self.interpreter.raise_error(
-                VariableError, "Invalid variable value", var_value
+                VariableError, f"Invalid variable value - {var_value}", var_value
             )
 
     def check_correct_var_name(self, var_name: str):
         if var_name[0].isdigit():
             self.interpreter.raise_error(
-                VariableError, "Invalid variable name", var_name
+                VariableError, f"Invalid variable name - {var_name}", var_name
             )
         if " " in var_name:
             self.interpreter.raise_error(
-                VariableError, "Invalid variable name", var_name
+                VariableError, f"Invalid variable name - {var_name}", var_name
             )
 
     def collection_assignment(self, collection_str: str, collection_type):

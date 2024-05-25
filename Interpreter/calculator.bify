@@ -1,4 +1,10 @@
-var a = 10
-while (a < 100)
-    var num = ignite("Please Write Number: ")
-end
+func factorial(num){
+    var result = 1
+    for (var i = 1; i < num; 1) {
+        var result = result * i
+        explode(result)
+
+    }
+}
+
+factorial(12)
